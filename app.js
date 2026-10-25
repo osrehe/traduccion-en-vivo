@@ -450,14 +450,24 @@ async function exportar() {
   const d = new Date();
   const dos = (n) => String(n).padStart(2, "0");
   const nombre = `traduccion-${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}-${dos(d.getHours())}${dos(d.getMinutes())}.md`;
-  const archivo = new File([markdown()], nombre, { type: "text/markdown" });
+  const texto = markdown();
+  // `text/plain` y no `text/markdown`: la hoja de compartir del iPhone no
+  // aceptaba el archivo con ese tipo, y la descarga de reserva no hace nada en
+  // iOS. El nombre conserva la extensión .md.
+  const archivo = new File([texto], nombre, { type: "text/plain" });
 
-  // En el iPhone, la hoja de compartir (Guardar en Archivos, Notas, Mail...);
-  // en el ordenador, una descarga normal.
+  // En el iPhone, la hoja de compartir: como archivo (Guardar en Archivos) si
+  // el sistema lo admite y, si no, como texto (Notas, Mail...). Un solo intento:
+  // `share()` gasta el gesto del usuario y un segundo intento lo rechazaría.
+  // En el ordenador, una descarga normal.
   const tactil = matchMedia("(pointer: coarse)").matches;
-  if (tactil && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+  if (tactil && navigator.share) {
+    const datos =
+      navigator.canShare && navigator.canShare({ files: [archivo] })
+        ? { files: [archivo], title: nombre }
+        : { title: nombre, text: texto };
     try {
-      await navigator.share({ files: [archivo], title: nombre });
+      await navigator.share(datos);
       return;
     } catch (exc) {
       if (exc && exc.name === "AbortError") return;
