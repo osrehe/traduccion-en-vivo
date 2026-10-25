@@ -68,13 +68,19 @@ function guardar(clave, valor) {
 }
 
 // Solo para probar contra tools/fake_server.py: `?servidor=ws://127.0.0.1:8765`.
-// Restringido a esta máquina para que un enlace no pueda desviar la clave.
+// Solo vale si la propia página se sirve desde esta máquina: en la versión
+// publicada, un enlace con ese parámetro mandaría la clave a lo que escuche en
+// ese puerto del teléfono.
+const LOCAL = ["127.0.0.1", "localhost"];
+
 function urlApi() {
-  const servidor = new URLSearchParams(location.search).get("servidor");
+  const servidor = LOCAL.includes(location.hostname)
+    ? new URLSearchParams(location.search).get("servidor")
+    : null;
   if (servidor) {
     try {
       const u = new URL(servidor);
-      if (u.protocol === "ws:" && ["127.0.0.1", "localhost"].includes(u.hostname)) {
+      if (u.protocol === "ws:" && LOCAL.includes(u.hostname)) {
         return `ws://${u.host}/v1/realtime/translations?model=${config.TRANSLATE_MODEL}`;
       }
     } catch {
