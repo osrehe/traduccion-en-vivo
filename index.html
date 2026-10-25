@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Traducción en vivo</title>
+<meta name="description" content="Inglés a español en vivo desde el micrófono">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Traducción">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  /* Colores de ui.py. Sin modo oscuro: el usuario lo descartó. */
+  :root {
+    color-scheme: light;
+    --es: #101010;
+    --en: #6a6a6a;
+    --vivo: #3c3c3c;
+    --en-vivo: #9a9a9a;
+    --sep: #b06000;
+    --borde: #e2e2e2;
+    --boton: #f3f3f3;
+    --verde: #188038;
+    --rojo: #c5221f;
+    --ambar: #c08000;
+    --gris: #9a9a9a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    background: #fff;
+    color: var(--es);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+
+  .barra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+    padding-top: max(8px, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--borde);
+  }
+  .barra button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #cfcfcf;
+    border-radius: 10px;
+    background: var(--boton);
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+  .barra button:disabled { opacity: 0.4; }
+  #btn-principal { min-width: 92px; background: var(--verde); border-color: var(--verde); color: #fff; font-weight: 600; }
+  #btn-principal.detener { background: var(--rojo); border-color: var(--rojo); }
+  .barra .icono { width: 42px; padding: 0; display: grid; place-items: center; }
+  .barra .icono svg { width: 22px; height: 22px; }
+  .toggle { display: flex; align-items: center; gap: 6px; font-size: 15px; user-select: none; }
+  .toggle input { width: 20px; height: 20px; margin: 0; accent-color: var(--verde); }
+  .hueco { flex: 1; }
+
+  main {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px max(16px, env(safe-area-inset-right)) 18px max(16px, env(safe-area-inset-left));
+  }
+  .fila { margin: 0 0 14px; }
+  .fila p { margin: 0; overflow-wrap: anywhere; }
+  .fila .en { color: var(--en); font-size: 15px; line-height: 1.35; margin-bottom: 2px; }
+  .fila .es { font-size: 19px; line-height: 1.4; }
+  .fila.abierta .es, .vivo .es { color: var(--vivo); }
+  .vivo .en { color: var(--en-vivo); }
+  .fila .en:empty, .fila .es:empty { display: none; }
+  .sin-ingles .en { display: none; }
+  .sep { text-align: center; color: var(--sep); font-style: italic; font-size: 14px; margin: 4px 0 16px; }
+  .vacio { color: var(--gris); font-size: 16px; line-height: 1.5; text-align: center; margin: 22vh 24px 0; }
+
+  #btn-final {
+    position: fixed;
+    right: 16px;
+    bottom: calc(52px + env(safe-area-inset-bottom));
+    padding: 10px 16px;
+    border: 1px solid #cfcfcf;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    font-size: 15px;
+  }
+
+  .pie {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px max(12px, env(safe-area-inset-right)) max(7px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    border-top: 1px solid var(--borde);
+    font-size: 13px;
+    color: #444;
+  }
+  .punto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--gris); }
+  #estado { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #nivel { flex: none; white-space: nowrap; }
+  #nivel.bajo { color: var(--rojo); font-weight: 600; }
+
+  dialog {
+    width: min(420px, calc(100vw - 32px));
+    border: none;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.3); }
+  dialog h2 { margin: 0 0 12px; font-size: 18px; }
+  dialog p { margin: 0 0 14px; font-size: 15px; line-height: 1.45; color: #333; }
+  dialog label { display: block; font-size: 14px; color: #444; margin: 12px 0 6px; }
+  dialog input[type=password], dialog input[type=text], dialog input[type=number] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #cfcfcf;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 16px; /* menos de 16 px hace que iOS amplíe la página al enfocar */
+  }
+  .nota { font-size: 13px; color: #666; margin-top: 6px; }
+  .aviso { color: var(--rojo); }
+  .acciones { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  .acciones button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #cfcfcf;
+    border-radius: 10px;
+    background: var(--boton);
+    font-size: 15px;
+  }
+  .acciones .primario { background: var(--verde); border-color: var(--verde); color: #fff; font-weight: 600; }
+  .acciones .izquierda { margin-right: auto; color: var(--rojo); }
+</style>
+</head>
+<body>
+<header class="barra">
+  <button id="btn-principal" type="button">Iniciar</button>
+  <button id="btn-reiniciar" type="button" disabled>Reiniciar</button>
+  <label class="toggle"><input type="checkbox" id="chk-ingles" checked> Inglés</label>
+  <span class="hueco"></span>
+  <button id="btn-exportar" class="icono" type="button" aria-label="Exportar a Markdown" title="Exportar a Markdown">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7.5 7.5 12 3l4.5 4.5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+  </button>
+  <button id="btn-ajustes" class="icono" type="button" aria-label="Ajustes" title="Ajustes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main id="transcript">
+  <p id="vacio" class="vacio">Pulsa <b>Iniciar</b> y deja el teléfono cerca de quien habla en inglés.</p>
+  <div id="filas"></div>
+  <div id="vivo" class="fila vivo" hidden><p class="en"></p><p class="es"></p></div>
+</main>
+<button id="btn-final" type="button" hidden>↓ volver al final</button>
+
+<footer class="pie">
+  <span id="punto" class="punto"></span>
+  <span id="estado">Detenido</span>
+  <span id="nivel"></span>
+</footer>
+
+<dialog id="dlg-ajustes">
+  <form method="dialog" id="form-ajustes">
+    <h2>Ajustes</h2>
+    <label for="in-clave">Clave de API de OpenAI</label>
+    <input id="in-clave" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-…">
+    <p class="nota" id="nota-clave">Se guarda solo en este dispositivo y solo se envía a OpenAI.</p>
+    <label for="in-ganancia">Ganancia del micrófono</label>
+    <input id="in-ganancia" type="number" min="1" max="8" step="0.5" inputmode="decimal">
+    <p class="nota">1 = tal cual. Súbela si el aviso dice que el micro no capta voz.</p>
+    <div class="acciones">
+      <button type="button" id="btn-borrar-clave" class="izquierda">Borrar clave</button>
+      <button value="cancelar">Cancelar</button>
+      <button value="guardar" class="primario">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-iniciar">
+  <h2>Iniciar</h2>
+  <p>Ya hay texto en pantalla. ¿Qué hacemos?</p>
+  <div class="acciones">
+    <button type="button" id="btn-cancelar-inicio">Cancelar</button>
+    <button type="button" id="btn-nuevo">Empezar de nuevo</button>
+    <button type="button" id="btn-continuar" class="primario">Continuar abajo</button>
+  </div>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
